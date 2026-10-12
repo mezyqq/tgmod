@@ -44,8 +44,10 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
         run: |
           if [ -z "$TG_API_ID" ] || [ -z "$TG_API_HASH" ]; then
-            echo "::error::Set TG_API_ID and TG_API_HASH repository secrets (https://my.telegram.org/apps)"
-            exit 1
+            # Compile check only: the app builds, but logging in will not work.
+            echo "::warning::TG_API_ID / TG_API_HASH secrets are not set (https://my.telegram.org/apps), building with placeholder keys"
+            TG_API_ID=1
+            TG_API_HASH=00000000000000000000000000000000
           fi
           # bundle_id / team_id must match build-system/fake-codesigning profiles;
           # the sideloading tool re-signs the app with your own identity.
