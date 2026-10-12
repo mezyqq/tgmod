@@ -34,16 +34,6 @@ jobs:
           fi
           xcodebuild -version
 
-      - name: Free disk space
-        run: |
-          df -h /
-          SELECTED="$(xcode-select -p | sed 's#/Contents/Developer##')"
-          for x in /Applications/Xcode*.app; do
-            if [ "$x" != "$SELECTED" ] && [ ! -L "$x" ]; then sudo rm -rf "$x"; fi
-          done
-          sudo rm -rf "$HOME/Library/Developer/CoreSimulator/Caches" "${ANDROID_HOME:-/nonexistent}" /usr/local/share/dotnet || true
-          df -h /
-
       - name: Write build configuration
         env:
           TG_API_ID: ${{ secrets.TG_API_ID }}
