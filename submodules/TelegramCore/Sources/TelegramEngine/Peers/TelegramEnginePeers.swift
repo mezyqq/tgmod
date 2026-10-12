@@ -140,7 +140,8 @@ public extension TelegramEngine {
     }
 
     final class Peers {
-        private let account: Account
+        // MARK: Mod - internal (was private) for ModFindPeerById
+        let account: Account
 
         init(account: Account) {
             self.account = account

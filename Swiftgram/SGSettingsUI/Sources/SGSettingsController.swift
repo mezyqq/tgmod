@@ -128,6 +128,7 @@ private enum SGSliderSetting: String {
 
 private enum SGDisclosureLink: String {
     case modCustomization
+    case modFindById
     case contentSettings
     case languageSettings
 }
@@ -156,6 +157,7 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     
     // MARK: Mod
     entries.append(.disclosure(id: id.count, section: .mod, link: .modCustomization, text: "🎨 Кастомизация"))
+    entries.append(.disclosure(id: id.count, section: .mod, link: .modFindById, text: "🔎 Найти аккаунт по ID"))
     
     
     if SGSimpleSettings.shared.canUseNY {
@@ -689,6 +691,35 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
         presentControllerImpl?(actionSheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
     }, openDisclosureLink: { link in
         switch (link) {
+            case .modFindById:
+                let alert = UIAlertController(title: "Поиск по ID", message: "ID пользователя (например 777000), группы (-123…) или канала (-100…).", preferredStyle: .alert)
+                alert.addTextField { textField in
+                    textField.placeholder = "ID"
+                    textField.keyboardType = .numbersAndPunctuation
+                    textField.autocorrectionType = .no
+                }
+                alert.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+                alert.addAction(UIAlertAction(title: "Найти", style: .default, handler: { [weak alert] _ in
+                    let text = (alert?.textFields?.first?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: " ", with: "")
+                    let showMessage: (String, String) -> Void = { title, message in
+                        let messageAlert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+                        messageAlert.addAction(UIAlertAction(title: "OK", style: .default))
+                        presentNativeControllerImpl?(messageAlert)
+                    }
+                    guard let peerIdValue = Int64(text), peerIdValue != 0 else {
+                        showMessage("Неверный ID", "Введите число, например 777000 или -1001234567890.")
+                        return
+                    }
+                    let _ = (context.engine.peers.modFindPeerById(peerIdValue)
+                    |> deliverOnMainQueue).start(next: { peer in
+                        if let peer, let peerInfoController = context.sharedContext.makePeerInfoController(context: context, updatedPresentationData: nil, peer: peer, mode: .generic, avatarInitiallyExpanded: false, fromChat: false, requestsContext: nil) {
+                            pushControllerImpl?(peerInfoController)
+                        } else {
+                            showMessage("Не найдено", "Telegram не отдаёт профиль по ID, если ваш аккаунт «не видел» этого человека: нет общих чатов, переписки или его сообщений в загруженных чатах. Каналы и группы находятся, если они публичные или вы в них состоите.")
+                        }
+                    })
+                }))
+                presentNativeControllerImpl?(alert)
             case .modCustomization:
                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
                 presentNativeControllerImpl?(modMakeSettingsController(isDark: presentationData.theme.overallDarkAppearance, accentColor: presentationData.theme.list.itemAccentColor))
