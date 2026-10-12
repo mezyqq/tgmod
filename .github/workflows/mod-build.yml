@@ -9,10 +9,16 @@ concurrency:
   group: mod-build
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-26
     timeout-minutes: 360
+    env:
+      TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+      TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -98,3 +104,30 @@ jobs:
           name: Mod-ipa-${{ github.run_number }}
           path: artifacts/Mod.ipa
           retention-days: 14
+
+      - name: Publish release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          VERSION=$(python3 -c 'import json;print(json.load(open("versions.json"))["app"])')
+          git log -1 --pretty=%B > "$RUNNER_TEMP/notes.txt"
+          gh release create "$TAG" artifacts/Mod.ipa --repo "${{ github.repository }}" --target "${{ github.sha }}" \
+            --title "Mod $VERSION (${{ github.run_number }})" --notes-file "$RUNNER_TEMP/notes.txt" --latest
+          echo "url=https://github.com/${{ github.repository }}/releases/download/$TAG/Mod.ipa" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Send release to Telegram
+        if: env.TG_BOT_TOKEN != '' && env.TG_CHAT_ID != ''
+        run: |
+          bash tools/mod-notify-telegram.sh artifacts/Mod.ipa "${{ steps.release.outputs.url }}" \
+            "✅ Новая сборка мода ${{ steps.release.outputs.version }} (${{ github.run_number }})
+          $(git log -1 --pretty=%s)"
+
+      - name: Report failure to Telegram
+        if: failure() && env.TG_BOT_TOKEN != '' && env.TG_CHAT_ID != ''
+        run: |
+          curl -sS "https://api.telegram.org/bot$TG_BOT_TOKEN/sendMessage" \
+            --data-urlencode chat_id="$TG_CHAT_ID" \
+            --data-urlencode text="❌ Сборка ${{ github.run_number }} упала: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" > /dev/null
