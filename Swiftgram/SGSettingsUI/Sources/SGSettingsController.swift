@@ -23,10 +23,12 @@ import AppBundle
 import WebKit
 import PeerNameColorScreen
 import UndoUI
+import ModSettingsUI
 
 
 private enum SGControllerSection: Int32, SGItemListSection {
     case search
+    case mod
     case trending
     case content
     case tabs
@@ -125,6 +127,7 @@ private enum SGSliderSetting: String {
 }
 
 private enum SGDisclosureLink: String {
+    case modCustomization
     case contentSettings
     case languageSettings
 }
@@ -150,6 +153,9 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     let id = SGItemListCounter()
     
     entries.append(.searchInput(id: id.count, section: .search, title: NSAttributedString(string: "🔍"), text: state.searchQuery ?? "", placeholder: strings.Common_Search))
+    
+    // MARK: Mod
+    entries.append(.disclosure(id: id.count, section: .mod, link: .modCustomization, text: "🎨 Кастомизация"))
     
     
     if SGSimpleSettings.shared.canUseNY {
@@ -334,6 +340,7 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
 
 public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int? = nil*/) -> ViewController {
     var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
+    var presentNativeControllerImpl: ((UIViewController) -> Void)?
     var pushControllerImpl: ((ViewController) -> Void)?
 //    var getRootControllerImpl: (() -> UIViewController?)?
 //    var getNavigationControllerImpl: (() -> NavigationController?)?
@@ -682,6 +689,9 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
         presentControllerImpl?(actionSheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
     }, openDisclosureLink: { link in
         switch (link) {
+            case .modCustomization:
+                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                presentNativeControllerImpl?(modMakeSettingsController(isDark: presentationData.theme.overallDarkAppearance, accentColor: presentationData.theme.list.itemAccentColor))
             case .languageSettings:
                 pushControllerImpl?(context.sharedContext.makeLocalizationListController(context: context))
             case .contentSettings:
@@ -745,6 +755,15 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
     }
     pushControllerImpl = { [weak controller] c in
         (controller?.navigationController as? NavigationController)?.pushViewController(c)
+    }
+    presentNativeControllerImpl = { [weak controller] c in
+        guard var topController = controller?.view.window?.rootViewController else {
+            return
+        }
+        while let presentedController = topController.presentedViewController {
+            topController = presentedController
+        }
+        topController.present(c, animated: true)
     }
 //    getRootControllerImpl = { [weak controller] in
 //        return controller?.view.window?.rootViewController

@@ -7,6 +7,7 @@ sgsrc = [
 sgdeps = [
     "//submodules/Utils/DeviceModel",
     "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
+    "//Swiftgram/ModFontOverride:ModFontOverride",
 ]
 
 swift_library(

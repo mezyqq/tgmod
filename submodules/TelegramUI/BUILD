@@ -6,6 +6,7 @@ load(
 )
 
 sgdeps = [
+    "//Swiftgram/ModVoice:ModVoice",
     "//Swiftgram/SGSettingsUI:SGSettingsUI",
     "//Swiftgram/SGConfig:SGConfig",
     "//Swiftgram/SGAPIWebSettings:SGAPIWebSettings",

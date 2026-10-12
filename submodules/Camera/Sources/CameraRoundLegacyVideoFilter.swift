@@ -1,4 +1,5 @@
 import Foundation
+import ModFaceMask
 import UIKit
 import AVFoundation
 import CoreImage
@@ -147,6 +148,9 @@ final class CameraRoundLegacyVideoFilter {
                 effectiveSourceImage = sourceImage
             }
         }
+        
+        // MARK: Mod - face mask
+        effectiveSourceImage = ModFaceMask.shared.apply(to: effectiveSourceImage)
         
         borderFilter.setValue(effectiveSourceImage, forKey: kCIInputBackgroundImageKey)
         

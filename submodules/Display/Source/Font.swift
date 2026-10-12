@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import ModFontOverride
 
 public struct Font {
     public enum Design {
@@ -163,6 +164,21 @@ public struct Font {
         
         if let cachedFont = self.cache.get(key) {
             return cachedFont
+        }
+        // MARK: Mod - custom font family
+        if ModFontOverride.isActive(), design == .regular || design == .round, let modFont = ModFontOverride.font(withSize: size, weight: weight.weight, italic: traits.contains(.italic)) {
+            var font = modFont
+            if traits.contains(.monospacedNumbers) {
+                let descriptor = modFont.fontDescriptor.addingAttributes([
+                    UIFontDescriptor.AttributeName.featureSettings: [
+                        [UIFontDescriptor.FeatureKey.featureIdentifier: kNumberSpacingType,
+                         UIFontDescriptor.FeatureKey.typeIdentifier: kMonospacedNumbersSelector]
+                    ]
+                ])
+                font = UIFont(descriptor: descriptor, size: size)
+            }
+            self.cache.set(font, key: key)
+            return font
         }
         if #available(iOS 13.0, *), design != .camera {
             let descriptor: UIFontDescriptor

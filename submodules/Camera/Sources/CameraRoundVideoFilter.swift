@@ -1,4 +1,5 @@
 import Foundation
+import ModFaceMask
 import UIKit
 import AVFoundation
 import CoreImage
@@ -278,6 +279,9 @@ final class CameraRoundVideoFilter {
                 effectiveSourceImage = sourceImage
             }
         }
+        
+        // MARK: Mod - face mask
+        effectiveSourceImage = ModFaceMask.shared.apply(to: effectiveSourceImage)
         
         let extendedImage = effectiveSourceImage.clampedToExtent()
         

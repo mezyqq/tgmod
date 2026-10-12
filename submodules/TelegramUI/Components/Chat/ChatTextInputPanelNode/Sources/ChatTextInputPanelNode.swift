@@ -44,6 +44,7 @@ import TooltipUI
 import ChatTextInputMediaRecordingButton
 import ChatContextQuery
 import ChatInputTextNode
+import ModTypingAnimation
 import ChatInputPanelNode
 import ChatRichTextEditorComposer
 import TelegramNotices
@@ -4053,6 +4054,9 @@ public class ChatTextInputPanelNode: ChatInputPanelNode, ASEditableTextNodeDeleg
             self.interfaceInteraction?.updateTextInputStateAndMode({ _, inputMode in return (inputTextState, inputMode) })
             self.interfaceInteraction?.updateInputLanguage({ _ in return self.richTextInputNode?.primaryLanguage })
             self.updateTextNodeText(animated: true)
+
+            // MARK: Mod - typing animation
+            ModTypingAnimator.shared.textDidChange(inputView: richTextInputNode.inputView, attributedText: richTextInputNode.attributedText, selectedRange: richTextInputNode.selectedRange)
         }
     }
     

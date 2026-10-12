@@ -1,4 +1,5 @@
 import Foundation
+import ModFaceMask
 import UIKit
 import Display
 import AVFoundation
@@ -94,6 +95,7 @@ public class CameraSimplePreviewView: UIView {
         
     private var previewingDisposable: Disposable?
     private let placeholderView = UIImageView()
+    private var modFaceMaskView: ModFaceMaskPreviewView?
     
     public init(frame: CGRect, main: Bool, roundVideo: Bool = false) {
         super.init(frame: frame)
@@ -107,6 +109,16 @@ public class CameraSimplePreviewView: UIView {
         }
         
         self.addSubview(self.placeholderView)
+        
+        // MARK: Mod - face mask preview
+        if roundVideo {
+            let modFaceMaskView = ModFaceMaskPreviewView(frame: self.bounds)
+            modFaceMaskView.isMirrored = { [weak self] in
+                return self?.videoPreviewLayer.connection?.isVideoMirrored ?? false
+            }
+            self.addSubview(modFaceMaskView)
+            self.modFaceMaskView = modFaceMaskView
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -122,6 +134,7 @@ public class CameraSimplePreviewView: UIView {
         
         self.updateOrientation()
         self.placeholderView.frame = self.bounds.insetBy(dx: -1.0, dy: -1.0)
+        self.modFaceMaskView?.frame = self.bounds
     }
     
     public func removePlaceholder(delay: Double = 0.0) {

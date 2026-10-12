@@ -9,7 +9,8 @@ load("//build-system/bazel-utils:plist_fragment.bzl",
 )
 
 sgDeps = [
-    "//Swiftgram/SGSimpleSettings:SGSimpleSettings"
+    "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
+    "//Swiftgram/ModFaceMask:ModFaceMask",
 ]
 
 filegroup(

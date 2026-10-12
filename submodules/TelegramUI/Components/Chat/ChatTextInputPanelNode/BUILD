@@ -12,6 +12,7 @@ swift_library(
     deps = [
         "//Swiftgram/SGSimpleSettings:SGSimpleSettings",
         "//Swiftgram/SGInputToolbar:SGInputToolbar",
+        "//Swiftgram/ModTypingAnimation:ModTypingAnimation",
         "//submodules/Display",
         "//submodules/AsyncDisplayKit",
         "//submodules/SSignalKit/SwiftSignalKit",

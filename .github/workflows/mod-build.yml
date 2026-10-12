@@ -1,0 +1,98 @@
+name: Build mod IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ mod ]
+
+concurrency:
+  group: mod-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 1
+
+      - name: Select Xcode
+        run: |
+          XCODE_VERSION=$(python3 -c 'import json;print(json.load(open("versions.json"))["xcode"])')
+          if [ -d "/Applications/Xcode_$XCODE_VERSION.app" ]; then
+            sudo xcode-select -s "/Applications/Xcode_$XCODE_VERSION.app/Contents/Developer"
+          fi
+          xcodebuild -version
+
+      - name: Free disk space
+        run: |
+          df -h /
+          SELECTED="$(xcode-select -p | sed 's#/Contents/Developer##')"
+          for x in /Applications/Xcode*.app; do
+            if [ "$x" != "$SELECTED" ] && [ ! -L "$x" ]; then sudo rm -rf "$x"; fi
+          done
+          sudo rm -rf "$HOME/Library/Developer/CoreSimulator/Caches" "${ANDROID_HOME:-/nonexistent}" /usr/local/share/dotnet || true
+          df -h /
+
+      - name: Write build configuration
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+        run: |
+          if [ -z "$TG_API_ID" ] || [ -z "$TG_API_HASH" ]; then
+            echo "::error::Set TG_API_ID and TG_API_HASH repository secrets (https://my.telegram.org/apps)"
+            exit 1
+          fi
+          # bundle_id / team_id must match build-system/fake-codesigning profiles;
+          # the sideloading tool re-signs the app with your own identity.
+          cat > "$RUNNER_TEMP/configuration.json" <<EOF
+          {
+            "bundle_id": "ph.telegra.Telegraph",
+            "api_id": "$TG_API_ID",
+            "api_hash": "$TG_API_HASH",
+            "team_id": "C67CF9S4VU",
+            "app_center_id": "0",
+            "is_internal_build": "true",
+            "is_appstore_build": "false",
+            "appstore_id": "0",
+            "app_specific_url_scheme": "tg",
+            "premium_iap_product_id": "",
+            "enable_siri": false,
+            "enable_icloud": false,
+            "sg_config": ""
+          }
+          EOF
+
+      - name: Restore Bazel cache
+        uses: actions/cache@v4
+        with:
+          path: ~/telegram-bazel-cache
+          key: bazel-${{ hashFiles('versions.json') }}-${{ github.sha }}
+          restore-keys: |
+            bazel-${{ hashFiles('versions.json') }}-
+
+      - name: Build
+        run: |
+          set -x
+          python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
+          python3 -u build-system/Make/Make.py \
+            --overrideXcodeVersion \
+            --cacheDir="$HOME/telegram-bazel-cache" \
+            build \
+            --configurationPath="$RUNNER_TEMP/configuration.json" \
+            --codesigningInformationPath=build-system/fake-codesigning \
+            --configuration=release_arm64 \
+            --buildNumber="${{ github.run_number }}"
+          mkdir -p artifacts
+          cp bazel-out/applebin_ios-ios_arm*-opt-ST-*/bin/Telegram/Telegram.ipa artifacts/Mod.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mod-ipa-${{ github.run_number }}
+          path: artifacts/Mod.ipa
+          retention-days: 14
