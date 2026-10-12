@@ -1,10 +1,12 @@
 import Foundation
 import UIKit
+import UniformTypeIdentifiers
 import ModSettings
 import ModFontOverride
 import ModTypingAnimation
 import ModVoice
 import ModFaceMask
+import ModText
 
 /// Entry point: the "Customization" screen wrapped into a navigation controller, to be presented modally.
 public func modMakeSettingsController(isDark: Bool, accentColor: UIColor) -> UIViewController {
@@ -16,57 +18,86 @@ public func modMakeSettingsController(isDark: Bool, accentColor: UIColor) -> UIV
     return navigationController
 }
 
-private enum Section: Int, CaseIterable {
-    case font
-    case typing
-    case mask
-    case voice
+private enum Row: Equatable {
+    case fontFamily
+
+    case typingPreview
+    case typingStyle
+    case typingDuration
+    case typingIntensity
+    case typingHaptics
+    case textStyle
+
+    case avatarsSquare
+    case avatarsCorner
+
+    case maskEnabled
+    case maskMode
+    case maskPhoto
+    case maskCircle
+    case maskScale
+    case maskFollowRotation
+    case maskCoverWhenLost
+    case videoFilter
+    case videoMirror
+
+    case voiceEnabled
+    case voicePreset
+    case voicePitch
+    case voiceRobot
+    case voiceEcho
+    case voiceReverb
+    case voiceRadio
+    case voiceGain
+    case voiceTest
+
+    case botsEnabled
+    case botsList
+
+    case effects
+
+    case backupExport
+    case backupImport
+    case backupReset
 }
 
-private enum MaskRow {
-    case enabled
-    case mode
-    case photo
-    case circle
-    case scale
-    case followRotation
-    case coverWhenLost
+private struct Section {
+    var title: String
+    var footer: String?
+    var rows: [Row]
 }
 
-private func maskRows() -> [MaskRow] {
-    if !ModSettings.maskEnabled {
-        return [.enabled]
+private enum ChatEffect: String, CaseIterable {
+    case `default`
+    case snow
+    case lightning
+
+    var title: String {
+        switch self {
+        case .default: return "Выключено"
+        case .snow: return "Снег"
+        case .lightning: return "Гирлянда"
+        }
     }
-    var rows: [MaskRow] = [.enabled, .mode]
-    if ModFaceMaskMode.current == .photo {
-        rows.append(contentsOf: [.photo, .circle])
+
+    static var current: ChatEffect {
+        if !UserDefaults.standard.bool(forKey: "canUseNY") {
+            return .default
+        }
+        return ChatEffect(rawValue: UserDefaults.standard.string(forKey: "nyStyle") ?? "") ?? .default
     }
-    rows.append(contentsOf: [.scale, .followRotation, .coverWhenLost])
-    return rows
+
+    func save() {
+        // Swiftgram's New Year effects (SGSimpleSettings keys), unlocked for the whole year.
+        UserDefaults.standard.set(self != .default, forKey: "canUseNY")
+        UserDefaults.standard.set(self.rawValue, forKey: "nyStyle")
+    }
 }
 
-private enum TypingRow: Int, CaseIterable {
-    case preview
-    case style
-    case duration
-    case intensity
-}
-
-private enum VoiceRow: Int, CaseIterable {
-    case enabled
-    case preset
-    case pitch
-    case robot
-    case echo
-    case reverb
-    case radio
-    case gain
-    case test
-}
-
-final class ModSettingsController: UITableViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+final class ModSettingsController: UITableViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIDocumentPickerDelegate {
     private let voiceTester = ModVoiceTester()
     private var voiceTestStatus: String = "Проверить голос (запись 3 сек)"
+    private var sections: [Section] = []
 
     init() {
         super.init(style: .insetGrouped)
@@ -95,13 +126,20 @@ final class ModSettingsController: UITableViewController, UIImagePickerControlle
             case let .failed(text):
                 self.voiceTestStatus = "⚠️ \(text)"
             }
-            self.tableView.reloadRows(at: [IndexPath(row: VoiceRow.test.rawValue, section: Section.voice.rawValue)], with: .none)
+            self.reload(row: .voiceTest)
         }
+        self.rebuild()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        self.rebuild()
+        self.tableView.reloadData()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        if self.isMovingFromParent || self.navigationController?.isBeingDismissed == true {
+        if self.navigationController?.isBeingDismissed == true {
             self.voiceTester.cancel()
         }
     }
@@ -111,49 +149,100 @@ final class ModSettingsController: UITableViewController, UIImagePickerControlle
         self.dismiss(animated: true)
     }
 
+    // MARK: Model
+
+    private func rebuild() {
+        var sections: [Section] = []
+
+        sections.append(Section(title: "Шрифт", footer: "Шрифт применяется ко всему интерфейсу и сообщениям после перезапуска.", rows: [.fontFamily]))
+
+        sections.append(Section(title: "Печать и текст", footer: "Напечатайте что-нибудь в поле выше, чтобы увидеть анимацию. «Стиль текста» превращает отправляемые сообщения в особые символы, их видят все, в любом клиенте. Ссылки, @упоминания и #теги не меняются.", rows: [.typingPreview, .typingStyle, .typingDuration, .typingIntensity, .typingHaptics, .textStyle]))
+
+        var avatarRows: [Row] = [.avatarsSquare]
+        if ModSettings.squareAvatars {
+            avatarRows.append(.avatarsCorner)
+        }
+        sections.append(Section(title: "Аватарки", footer: "Квадратные аватарки везде: списки чатов, сообщения, профили, сторис. Применяется после перезапуска.", rows: avatarRows))
+
+        var maskRows: [Row] = [.maskEnabled]
+        if ModSettings.maskEnabled {
+            maskRows.append(.maskMode)
+            if ModFaceMaskMode.current == .photo {
+                maskRows.append(contentsOf: [.maskPhoto, .maskCircle])
+            }
+            maskRows.append(contentsOf: [.maskScale, .maskFollowRotation, .maskCoverWhenLost])
+        }
+        maskRows.append(contentsOf: [.videoFilter, .videoMirror])
+        sections.append(Section(title: "Кружки", footer: "Маска закрывает лицо в видеосообщениях и следует за ним. «Закрывать при потере лица» не даст лицу мелькнуть, если распознавание на секунду сбилось. Фильтр и отражение тоже применяются к записи.", rows: maskRows))
+
+        var voiceRows: [Row] = [.voiceEnabled]
+        if ModSettings.voiceEnabled {
+            voiceRows.append(contentsOf: [.voicePreset, .voicePitch, .voiceRobot, .voiceEcho, .voiceReverb, .voiceRadio, .voiceGain, .voiceTest])
+        }
+        sections.append(Section(title: "Смена голоса", footer: "Эффект применяется к голосовым сообщениям при записи. Собеседник услышит изменённый голос.", rows: voiceRows))
+
+        sections.append(Section(title: "Личные боты", footer: "Автоответы, которые выполняет сам клиент: работают, пока приложение открыто или недавно свёрнуто.", rows: ModBotRules.isEnabled ? [.botsEnabled, .botsList] : [.botsEnabled]))
+
+        sections.append(Section(title: "Эффекты", footer: "Падающий снег или гирлянда в интерфейсе. Применяется после перезапуска.", rows: [.effects]))
+
+        sections.append(Section(title: "Настройки мода", footer: "Экспорт сохраняет все настройки мода и личных ботов в файл, им можно поделиться. Шрифты и фото маски в файл не входят.", rows: [.backupExport, .backupImport, .backupReset]))
+
+        self.sections = sections
+    }
+
+    private func indexPath(of row: Row) -> IndexPath? {
+        for (sectionIndex, section) in self.sections.enumerated() {
+            if let rowIndex = section.rows.firstIndex(of: row) {
+                return IndexPath(row: rowIndex, section: sectionIndex)
+            }
+        }
+        return nil
+    }
+
+    private func reload(row: Row) {
+        if let indexPath = self.indexPath(of: row) {
+            self.tableView.reloadRows(at: [indexPath], with: .none)
+        }
+    }
+
+    private func reloadStructure() {
+        self.rebuild()
+        self.tableView.reloadData()
+    }
+
     // MARK: Table
 
     override func numberOfSections(in tableView: UITableView) -> Int {
-        return Section.allCases.count
+        return self.sections.count
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch Section(rawValue: section)! {
-        case .font:
-            return 1
-        case .typing:
-            return TypingRow.allCases.count
-        case .mask:
-            return maskRows().count
-        case .voice:
-            return ModSettings.voiceEnabled ? VoiceRow.allCases.count : 1
-        }
+        return self.sections[section].rows.count
     }
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        switch Section(rawValue: section)! {
-        case .font:
-            return "Шрифт"
-        case .typing:
-            return "Анимация печати"
-        case .mask:
-            return "Маска в кружках"
-        case .voice:
-            return "Смена голоса"
-        }
+        return self.sections[section].title
     }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        switch Section(rawValue: section)! {
-        case .font:
-            return "Шрифт применяется ко всему интерфейсу и сообщениям после перезапуска."
-        case .typing:
-            return "Напечатайте что-нибудь в поле выше, чтобы увидеть анимацию. Работает в поле ввода всех чатов."
-        case .mask:
-            return "Лицо в видеосообщениях закрывается маской: она находит лицо и следует за ним. «Закрывать при потере лица» не даст лицу мелькнуть, если распознавание на секунду сбилось."
-        case .voice:
-            return "Эффект применяется к голосовым сообщениям при записи. Собеседник услышит изменённый голос."
-        }
+        return self.sections[section].footer
+    }
+
+    private func valueCell(_ tableView: UITableView, title: String, value: String) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "value") ?? UITableViewCell(style: .value1, reuseIdentifier: "value")
+        cell.textLabel?.text = title
+        cell.textLabel?.textColor = .label
+        cell.detailTextLabel?.text = value
+        cell.accessoryType = .disclosureIndicator
+        return cell
+    }
+
+    private func buttonCell(_ tableView: UITableView, title: String, destructive: Bool = false) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "button") ?? UITableViewCell(style: .default, reuseIdentifier: "button")
+        cell.textLabel?.text = title
+        cell.textLabel?.textColor = destructive ? .systemRed : self.view.tintColor
+        cell.imageView?.image = nil
+        return cell
     }
 
     private func switchCell(_ tableView: UITableView, title: String, value: Bool, onChange: @escaping (Bool) -> Void) -> UITableViewCell {
@@ -161,14 +250,6 @@ final class ModSettingsController: UITableViewController, UIImagePickerControlle
         cell.textLabel?.text = title
         cell.toggle.isOn = value
         cell.onChange = onChange
-        return cell
-    }
-
-    private func valueCell(_ tableView: UITableView, title: String, value: String) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "value") ?? UITableViewCell(style: .value1, reuseIdentifier: "value")
-        cell.textLabel?.text = title
-        cell.detailTextLabel?.text = value
-        cell.accessoryType = .disclosureIndicator
         return cell
     }
 
@@ -184,182 +265,245 @@ final class ModSettingsController: UITableViewController, UIImagePickerControlle
         config.saveToSettings()
         if ModSettings.voicePreset != ModVoicePreset.custom.rawValue {
             ModSettings.voicePreset = ModVoicePreset.custom.rawValue
-            self.tableView.reloadRows(at: [IndexPath(row: VoiceRow.preset.rawValue, section: Section.voice.rawValue)], with: .none)
+            self.reload(row: .voicePreset)
         }
     }
 
+    private static let percent: (Float) -> String = { String(format: "%.0f%%", $0 * 100.0) }
+
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        switch Section(rawValue: indexPath.section)! {
-        case .font:
+        let row = self.sections[indexPath.section].rows[indexPath.row]
+        switch row {
+        case .fontFamily:
             let family = ModSettings.fontFamily
             return self.valueCell(tableView, title: "Шрифт", value: family.isEmpty ? "Системный" : family)
-        case .typing:
-            switch TypingRow(rawValue: indexPath.row)! {
-            case .preview:
-                let cell = (tableView.dequeueReusableCell(withIdentifier: "preview") as? ModTextPreviewCell) ?? ModTextPreviewCell(style: .default, reuseIdentifier: "preview")
-                cell.onTextChange = { textView in
-                    ModTypingAnimator.shared.textDidChange(inputView: textView, attributedText: textView.attributedText, selectedRange: textView.selectedRange)
-                }
-                return cell
-            case .style:
-                return self.valueCell(tableView, title: "Стиль", value: ModTypingStyle.current.title)
-            case .duration:
-                return self.sliderCell(tableView, title: "Длительность", value: ModSettings.typingDuration, range: 0.1 ... 1.0, format: { String(format: "%.2f с", $0) }, onChange: { value in
-                    ModSettings.typingDuration = Double(value)
-                })
-            case .intensity:
-                return self.sliderCell(tableView, title: "Сила", value: ModSettings.typingIntensity, range: 0.25 ... 2.0, format: { String(format: "×%.2f", $0) }, onChange: { value in
-                    ModSettings.typingIntensity = Double(value)
-                })
+
+        case .typingPreview:
+            let cell = (tableView.dequeueReusableCell(withIdentifier: "preview") as? ModTextPreviewCell) ?? ModTextPreviewCell(style: .default, reuseIdentifier: "preview")
+            cell.onTextChange = { textView in
+                ModTypingAnimator.shared.textDidChange(inputView: textView, attributedText: textView.attributedText, selectedRange: textView.selectedRange)
             }
-        case .mask:
-            switch maskRows()[indexPath.row] {
-            case .enabled:
-                return self.switchCell(tableView, title: "Маска", value: ModSettings.maskEnabled, onChange: { [weak self] value in
-                    ModSettings.maskEnabled = value
-                    self?.tableView.reloadSections(IndexSet(integer: Section.mask.rawValue), with: .automatic)
-                })
-            case .mode:
-                return self.valueCell(tableView, title: "Тип", value: ModFaceMaskMode.current.title)
-            case .photo:
-                let cell = tableView.dequeueReusableCell(withIdentifier: "photo") ?? UITableViewCell(style: .default, reuseIdentifier: "photo")
-                let photo = ModFaceMask.storedMaskPhoto()
-                cell.textLabel?.text = photo == nil ? "Выбрать фото" : "Сменить фото"
-                cell.textLabel?.textColor = self.view.tintColor
-                cell.imageView?.image = photo.map { image in
-                    UIGraphicsImageRenderer(size: CGSize(width: 40.0, height: 40.0)).image { _ in
-                        let rect = CGRect(x: 0.0, y: 0.0, width: 40.0, height: 40.0)
-                        if ModSettings.maskCircle {
-                            UIBezierPath(ovalIn: rect).addClip()
-                        }
-                        image.draw(in: rect)
+            return cell
+        case .typingStyle:
+            return self.valueCell(tableView, title: "Анимация печати", value: ModTypingStyle.current.title)
+        case .typingDuration:
+            return self.sliderCell(tableView, title: "Длительность", value: ModSettings.typingDuration, range: 0.1 ... 1.0, format: { String(format: "%.2f с", $0) }, onChange: { value in
+                ModSettings.typingDuration = Double(value)
+            })
+        case .typingIntensity:
+            return self.sliderCell(tableView, title: "Сила", value: ModSettings.typingIntensity, range: 0.25 ... 2.0, format: { String(format: "×%.2f", $0) }, onChange: { value in
+                ModSettings.typingIntensity = Double(value)
+            })
+        case .typingHaptics:
+            return self.switchCell(tableView, title: "Вибрация при печати", value: ModSettings.typingHaptics, onChange: { value in
+                ModSettings.typingHaptics = value
+            })
+        case .textStyle:
+            return self.valueCell(tableView, title: "Стиль текста", value: ModTextStyle.current.title)
+
+        case .avatarsSquare:
+            return self.switchCell(tableView, title: "Квадратные аватарки", value: ModSettings.squareAvatars, onChange: { [weak self] value in
+                ModSettings.squareAvatars = value
+                self?.reloadStructure()
+                self?.askForRestart(message: "Форма аватарок изменится после перезапуска.")
+            })
+        case .avatarsCorner:
+            let cell = self.sliderCell(tableView, title: "Скругление углов", value: ModSettings.avatarCornerRatio, range: 0.0 ... 0.5, format: { value in
+                return value < 0.01 ? "Острые" : String(format: "%.0f%%", value * 200.0)
+            }, onChange: { value in
+                ModSettings.avatarCornerRatio = Double(value)
+            })
+            return cell
+
+        case .maskEnabled:
+            return self.switchCell(tableView, title: "Маска на лицо", value: ModSettings.maskEnabled, onChange: { [weak self] value in
+                ModSettings.maskEnabled = value
+                self?.reloadStructure()
+            })
+        case .maskMode:
+            return self.valueCell(tableView, title: "Тип маски", value: ModFaceMaskMode.current.title)
+        case .maskPhoto:
+            let cell = self.buttonCell(tableView, title: ModFaceMask.storedMaskPhoto() == nil ? "Выбрать фото" : "Сменить фото")
+            cell.imageView?.image = ModFaceMask.storedMaskPhoto().map { image in
+                UIGraphicsImageRenderer(size: CGSize(width: 40.0, height: 40.0)).image { _ in
+                    let rect = CGRect(x: 0.0, y: 0.0, width: 40.0, height: 40.0)
+                    if ModSettings.maskCircle {
+                        UIBezierPath(ovalIn: rect).addClip()
                     }
+                    image.draw(in: rect)
                 }
-                return cell
-            case .circle:
-                return self.switchCell(tableView, title: "Круглая маска", value: ModSettings.maskCircle, onChange: { [weak self] value in
-                    ModSettings.maskCircle = value
-                    self?.tableView.reloadSections(IndexSet(integer: Section.mask.rawValue), with: .none)
-                })
-            case .scale:
-                return self.sliderCell(tableView, title: "Размер маски", value: ModSettings.maskScale, range: 1.0 ... 2.5, format: { String(format: "×%.2f", $0) }, onChange: { value in
-                    ModSettings.maskScale = Double(value)
-                })
-            case .followRotation:
-                return self.switchCell(tableView, title: "Поворачивать с головой", value: ModSettings.maskFollowRotation, onChange: { value in
-                    ModSettings.maskFollowRotation = value
-                })
-            case .coverWhenLost:
-                return self.switchCell(tableView, title: "Закрывать при потере лица", value: ModSettings.maskCoverWhenLost, onChange: { value in
-                    ModSettings.maskCoverWhenLost = value
-                })
             }
-        case .voice:
-            switch VoiceRow(rawValue: indexPath.row)! {
-            case .enabled:
-                let cell = (tableView.dequeueReusableCell(withIdentifier: "switch") as? ModSwitchCell) ?? ModSwitchCell(style: .default, reuseIdentifier: "switch")
-                cell.textLabel?.text = "Менять голос"
-                cell.toggle.isOn = ModSettings.voiceEnabled
-                cell.onChange = { [weak self] value in
-                    ModSettings.voiceEnabled = value
-                    self?.tableView.reloadSections(IndexSet(integer: Section.voice.rawValue), with: .automatic)
-                }
-                return cell
-            case .preset:
-                return self.valueCell(tableView, title: "Пресет", value: (ModVoicePreset(rawValue: ModSettings.voicePreset) ?? .custom).title)
-            case .pitch:
-                return self.sliderCell(tableView, title: "Высота голоса (питч)", value: ModSettings.voicePitch, range: -12.0 ... 12.0, format: { String(format: "%+.1f полутон.", $0) }, onChange: { [weak self] value in
-                    self?.voiceSliderChanged { $0.pitch = Double(value) }
-                })
-            case .robot:
-                return self.sliderCell(tableView, title: "Робот", value: ModSettings.voiceRobot, range: 0.0 ... 1.0, format: { String(format: "%.0f%%", $0 * 100.0) }, onChange: { [weak self] value in
-                    self?.voiceSliderChanged { $0.robot = Double(value) }
-                })
-            case .echo:
-                return self.sliderCell(tableView, title: "Эхо", value: ModSettings.voiceEcho, range: 0.0 ... 1.0, format: { String(format: "%.0f%%", $0 * 100.0) }, onChange: { [weak self] value in
-                    self?.voiceSliderChanged { $0.echo = Double(value) }
-                })
-            case .reverb:
-                return self.sliderCell(tableView, title: "Реверберация", value: ModSettings.voiceReverb, range: 0.0 ... 1.0, format: { String(format: "%.0f%%", $0 * 100.0) }, onChange: { [weak self] value in
-                    self?.voiceSliderChanged { $0.reverb = Double(value) }
-                })
-            case .radio:
-                return self.sliderCell(tableView, title: "Рация", value: ModSettings.voiceRadio, range: 0.0 ... 1.0, format: { String(format: "%.0f%%", $0 * 100.0) }, onChange: { [weak self] value in
-                    self?.voiceSliderChanged { $0.radio = Double(value) }
-                })
-            case .gain:
-                return self.sliderCell(tableView, title: "Громкость", value: ModSettings.voiceGain, range: -6.0 ... 12.0, format: { String(format: "%+.1f дБ", $0) }, onChange: { [weak self] value in
-                    self?.voiceSliderChanged { $0.gain = Double(value) }
-                })
-            case .test:
-                let cell = tableView.dequeueReusableCell(withIdentifier: "button") ?? UITableViewCell(style: .default, reuseIdentifier: "button")
-                cell.textLabel?.text = self.voiceTestStatus
-                cell.textLabel?.textColor = self.view.tintColor
-                return cell
-            }
+            return cell
+        case .maskCircle:
+            return self.switchCell(tableView, title: "Круглая маска", value: ModSettings.maskCircle, onChange: { [weak self] value in
+                ModSettings.maskCircle = value
+                self?.reload(row: .maskPhoto)
+            })
+        case .maskScale:
+            return self.sliderCell(tableView, title: "Размер маски", value: ModSettings.maskScale, range: 1.0 ... 2.5, format: { String(format: "×%.2f", $0) }, onChange: { value in
+                ModSettings.maskScale = Double(value)
+            })
+        case .maskFollowRotation:
+            return self.switchCell(tableView, title: "Поворачивать с головой", value: ModSettings.maskFollowRotation, onChange: { value in
+                ModSettings.maskFollowRotation = value
+            })
+        case .maskCoverWhenLost:
+            return self.switchCell(tableView, title: "Закрывать при потере лица", value: ModSettings.maskCoverWhenLost, onChange: { value in
+                ModSettings.maskCoverWhenLost = value
+            })
+        case .videoFilter:
+            return self.valueCell(tableView, title: "Фильтр", value: ModVideoFilter.current.title)
+        case .videoMirror:
+            return self.switchCell(tableView, title: "Отражать по горизонтали", value: ModVideoFilter.mirror, onChange: { value in
+                ModVideoFilter.mirror = value
+            })
+
+        case .voiceEnabled:
+            return self.switchCell(tableView, title: "Менять голос", value: ModSettings.voiceEnabled, onChange: { [weak self] value in
+                ModSettings.voiceEnabled = value
+                self?.reloadStructure()
+            })
+        case .voicePreset:
+            return self.valueCell(tableView, title: "Пресет", value: (ModVoicePreset(rawValue: ModSettings.voicePreset) ?? .custom).title)
+        case .voicePitch:
+            return self.sliderCell(tableView, title: "Высота голоса (питч)", value: ModSettings.voicePitch, range: -12.0 ... 12.0, format: { String(format: "%+.1f полутон.", $0) }, onChange: { [weak self] value in
+                self?.voiceSliderChanged { $0.pitch = Double(value) }
+            })
+        case .voiceRobot:
+            return self.sliderCell(tableView, title: "Робот", value: ModSettings.voiceRobot, range: 0.0 ... 1.0, format: ModSettingsController.percent, onChange: { [weak self] value in
+                self?.voiceSliderChanged { $0.robot = Double(value) }
+            })
+        case .voiceEcho:
+            return self.sliderCell(tableView, title: "Эхо", value: ModSettings.voiceEcho, range: 0.0 ... 1.0, format: ModSettingsController.percent, onChange: { [weak self] value in
+                self?.voiceSliderChanged { $0.echo = Double(value) }
+            })
+        case .voiceReverb:
+            return self.sliderCell(tableView, title: "Реверберация", value: ModSettings.voiceReverb, range: 0.0 ... 1.0, format: ModSettingsController.percent, onChange: { [weak self] value in
+                self?.voiceSliderChanged { $0.reverb = Double(value) }
+            })
+        case .voiceRadio:
+            return self.sliderCell(tableView, title: "Рация", value: ModSettings.voiceRadio, range: 0.0 ... 1.0, format: ModSettingsController.percent, onChange: { [weak self] value in
+                self?.voiceSliderChanged { $0.radio = Double(value) }
+            })
+        case .voiceGain:
+            return self.sliderCell(tableView, title: "Громкость", value: ModSettings.voiceGain, range: -6.0 ... 12.0, format: { String(format: "%+.1f дБ", $0) }, onChange: { [weak self] value in
+                self?.voiceSliderChanged { $0.gain = Double(value) }
+            })
+        case .voiceTest:
+            return self.buttonCell(tableView, title: self.voiceTestStatus)
+
+        case .botsEnabled:
+            return self.switchCell(tableView, title: "Личные боты", value: ModBotRules.isEnabled, onChange: { [weak self] value in
+                ModBotRules.isEnabled = value
+                self?.reloadStructure()
+            })
+        case .botsList:
+            let rules = ModBotRules.rules
+            let enabledCount = rules.filter(\.isEnabled).count
+            return self.valueCell(tableView, title: "Боты", value: rules.isEmpty ? "Нет" : "\(enabledCount) из \(rules.count) вкл.")
+
+        case .effects:
+            return self.valueCell(tableView, title: "Эффект", value: ChatEffect.current.title)
+
+        case .backupExport:
+            return self.buttonCell(tableView, title: "Экспорт настроек")
+        case .backupImport:
+            return self.buttonCell(tableView, title: "Импорт настроек")
+        case .backupReset:
+            return self.buttonCell(tableView, title: "Сбросить настройки мода", destructive: true)
         }
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        switch Section(rawValue: indexPath.section)! {
-        case .font:
+        let row = self.sections[indexPath.section].rows[indexPath.row]
+        switch row {
+        case .fontFamily:
             let controller = ModFontPickerController(selected: ModSettings.fontFamily, onSelect: { [weak self] family in
                 ModSettings.fontFamily = family
-                self?.tableView.reloadData()
-                self?.askForRestart()
+                self?.reload(row: .fontFamily)
+                self?.askForRestart(message: "Шрифт применится после перезапуска приложения.")
             })
             self.navigationController?.pushViewController(controller, animated: true)
-        case .typing:
-            if indexPath.row == TypingRow.style.rawValue {
-                let options = ModTypingStyle.allCases.map { (id: $0.rawValue, title: $0.title) }
-                let controller = ModOptionsController(title: "Стиль анимации", options: options, selected: ModTypingStyle.current.rawValue, onSelect: { [weak self] id in
-                    ModSettings.typingStyle = id
-                    self?.tableView.reloadData()
-                })
-                self.navigationController?.pushViewController(controller, animated: true)
+        case .typingStyle:
+            self.pushOptions(title: "Анимация печати", options: ModTypingStyle.allCases.map { (id: $0.rawValue, title: $0.title) }, selected: ModTypingStyle.current.rawValue) { id in
+                ModSettings.typingStyle = id
             }
-        case .mask:
-            switch maskRows()[indexPath.row] {
-            case .mode:
-                let options = ModFaceMaskMode.allCases.map { (id: $0.rawValue, title: $0.title) }
-                let controller = ModOptionsController(title: "Тип маски", options: options, selected: ModFaceMaskMode.current.rawValue, onSelect: { [weak self] id in
-                    ModSettings.maskMode = id
-                    self?.tableView.reloadData()
-                })
-                self.navigationController?.pushViewController(controller, animated: true)
-            case .photo:
-                let picker = UIImagePickerController()
-                picker.sourceType = .photoLibrary
-                picker.allowsEditing = true
-                picker.delegate = self
-                self.present(picker, animated: true)
-            default:
-                break
+        case .textStyle:
+            self.pushOptions(title: "Стиль текста", options: ModTextStyle.allCases.map { (id: $0.rawValue, title: $0 == .none ? $0.title : "\($0.title)   — \($0.description)") }, selected: ModTextStyle.current.rawValue) { id in
+                ModTextStyle.current = ModTextStyle(rawValue: id) ?? .none
             }
-        case .voice:
-            if indexPath.row == VoiceRow.preset.rawValue {
-                let options = ModVoicePreset.allCases.map { (id: $0.rawValue, title: $0.title) }
-                let controller = ModOptionsController(title: "Пресет голоса", options: options, selected: ModSettings.voicePreset, onSelect: { [weak self] id in
-                    ModSettings.voicePreset = id
-                    if let config = ModVoicePreset(rawValue: id)?.config {
-                        config.saveToSettings()
-                    }
-                    self?.tableView.reloadData()
-                })
-                self.navigationController?.pushViewController(controller, animated: true)
-            } else if indexPath.row == VoiceRow.test.rawValue {
-                self.voiceTester.run(seconds: 3.0, config: ModVoiceConfig.fromSettings())
+        case .maskMode:
+            self.pushOptions(title: "Тип маски", options: ModFaceMaskMode.allCases.map { (id: $0.rawValue, title: $0.title) }, selected: ModFaceMaskMode.current.rawValue) { id in
+                ModSettings.maskMode = id
             }
+        case .maskPhoto:
+            let picker = UIImagePickerController()
+            picker.sourceType = .photoLibrary
+            picker.allowsEditing = true
+            picker.delegate = self
+            self.present(picker, animated: true)
+        case .videoFilter:
+            self.pushOptions(title: "Фильтр кружков", options: ModVideoFilter.allCases.map { (id: $0.rawValue, title: $0.title) }, selected: ModVideoFilter.current.rawValue) { id in
+                ModVideoFilter.current = ModVideoFilter(rawValue: id) ?? .none
+            }
+        case .voicePreset:
+            self.pushOptions(title: "Пресет голоса", options: ModVoicePreset.allCases.map { (id: $0.rawValue, title: $0.title) }, selected: ModSettings.voicePreset) { id in
+                ModSettings.voicePreset = id
+                if let config = ModVoicePreset(rawValue: id)?.config {
+                    config.saveToSettings()
+                }
+            }
+        case .voiceTest:
+            self.voiceTester.run(seconds: 3.0, config: ModVoiceConfig.fromSettings())
+        case .botsList:
+            self.navigationController?.pushViewController(ModBotsController(), animated: true)
+        case .effects:
+            self.pushOptions(title: "Эффект", options: ChatEffect.allCases.map { (id: $0.rawValue, title: $0.title) }, selected: ChatEffect.current.rawValue) { [weak self] id in
+                (ChatEffect(rawValue: id) ?? .default).save()
+                self?.askForRestart(message: "Эффект появится после перезапуска.")
+            }
+        case .backupExport:
+            self.exportSettings(sourceView: tableView.cellForRow(at: indexPath))
+        case .backupImport:
+            let picker: UIDocumentPickerViewController
+            if #available(iOS 14.0, *) {
+                picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.propertyList, UTType.xml, UTType.data], asCopy: true)
+            } else {
+                picker = UIDocumentPickerViewController(documentTypes: ["com.apple.property-list", "public.xml", "public.data"], in: .import)
+            }
+            picker.delegate = self
+            self.present(picker, animated: true)
+        case .backupReset:
+            let alert = UIAlertController(title: "Сбросить все настройки мода?", message: "Личные боты тоже удалятся.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Сбросить", style: .destructive, handler: { [weak self] _ in
+                ModSettingsBackup.reset()
+                self?.reloadStructure()
+                self?.askForRestart(message: "Настройки сброшены.")
+            }))
+            self.present(alert, animated: true)
+        default:
+            break
         }
     }
+
+    private func pushOptions(title: String, options: [(id: String, title: String)], selected: String, onSelect: @escaping (String) -> Void) {
+        let controller = ModOptionsController(title: title, options: options, selected: selected, onSelect: { [weak self] id in
+            onSelect(id)
+            self?.reloadStructure()
+        })
+        self.navigationController?.pushViewController(controller, animated: true)
+    }
+
+    // MARK: Mask photo
 
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
         let image = (info[.editedImage] as? UIImage) ?? (info[.originalImage] as? UIImage)
         picker.dismiss(animated: true)
         if let image {
             ModFaceMask.saveMaskPhoto(image)
-            self.tableView.reloadSections(IndexSet(integer: Section.mask.rawValue), with: .none)
+            self.reload(row: .maskPhoto)
         }
     }
 
@@ -367,8 +511,34 @@ final class ModSettingsController: UITableViewController, UIImagePickerControlle
         picker.dismiss(animated: true)
     }
 
-    private func askForRestart() {
-        let alert = UIAlertController(title: "Нужен перезапуск", message: "Шрифт применится после перезапуска приложения.", preferredStyle: .alert)
+    // MARK: Backup
+
+    private func exportSettings(sourceView: UIView?) {
+        guard let url = ModSettingsBackup.exportToFile() else {
+            return
+        }
+        let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        controller.popoverPresentationController?.sourceView = sourceView ?? self.view
+        self.present(controller, animated: true)
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else {
+            return
+        }
+        let success = ModSettingsBackup.importFromFile(url)
+        self.reloadStructure()
+        if success {
+            self.askForRestart(message: "Настройки импортированы. Часть из них применится после перезапуска.")
+        } else {
+            let alert = UIAlertController(title: "Не удалось импортировать", message: "Файл не похож на настройки мода.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            self.present(alert, animated: true)
+        }
+    }
+
+    private func askForRestart(message: String) {
+        let alert = UIAlertController(title: "Нужен перезапуск", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Позже", style: .cancel))
         alert.addAction(UIAlertAction(title: "Перезапустить", style: .destructive, handler: { _ in
             exit(0)

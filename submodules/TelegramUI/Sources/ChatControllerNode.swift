@@ -1,5 +1,6 @@
 import Foundation
 import SGSimpleSettings
+import ModText
 import UIKit
 import AsyncDisplayKit
 import Postbox
@@ -4886,7 +4887,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
             
             var messages: [EnqueueMessage] = []
             
-            let effectiveInputText: NSAttributedString
+            var effectiveInputText: NSAttributedString
             let composeContent = effectivePresentationInterfaceState.interfaceState.composeInputState.content
             let isNewMessage = effectivePresentationInterfaceState.interfaceState.editMessage == nil
             let requiresPremiumRichContent = isNewMessage
@@ -4941,6 +4942,11 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
                 effectiveInputText = expandedInputStateAttributedString(effectivePresentationInterfaceState.interfaceState.effectiveInputState.inputText)
             } else {
                 effectiveInputText = expandedInputStateAttributedString(effectivePresentationInterfaceState.interfaceState.composeInputState.inputText)
+            }
+            
+            // MARK: Mod - text style for new messages
+            if effectivePresentationInterfaceState.interfaceState.editMessage == nil && !sendWithoutFormatting {
+                effectiveInputText = ModTextStyle.current.apply(to: effectiveInputText, skippingAttributes: [ChatTextInputAttributes.customEmoji, ChatTextInputAttributes.textUrl, ChatTextInputAttributes.textMention, ChatTextInputAttributes.monospace, ChatTextInputAttributes.date])
             }
 
             // Rich-message routing: new messages only (editMessage == nil), structural content the entity

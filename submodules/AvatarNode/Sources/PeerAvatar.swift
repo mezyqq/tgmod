@@ -184,6 +184,7 @@ public func peerAvatarImage(account: Account, peerReference: PeerReference?, aut
 }
     
 public func peerAvatarImage(postbox: Postbox, peerReference: PeerReference?, authorOfMessage: MessageReference?, representation: TelegramMediaImageRepresentation?, displayDimensions: CGSize = CGSize(width: 60.0, height: 60.0), clipStyle: AvatarNodeClipStyle = .round, blurred: Bool = false, inset: CGFloat = 0.0, emptyColor: UIColor? = nil, synchronousLoad: Bool = false, provideUnrounded: Bool = false, cutoutRect: CGRect? = nil) -> Signal<(UIImage, UIImage)?, NoError>? {
+    let clipStyle = modEffectiveClipStyle(clipStyle)
     if let imageData = peerAvatarImageData(postbox: postbox, peerReference: peerReference, authorOfMessage: authorOfMessage, representation: representation, synchronousLoad: synchronousLoad) {
         return imageData
         |> mapToSignal { data -> Signal<(UIImage, UIImage)?, NoError> in
@@ -206,7 +207,7 @@ public func peerAvatarImage(postbox: Postbox, peerReference: PeerReference?, aut
                                     context.clip()
                                 }
                             case .roundedRect:
-                                context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: floor(displayDimensions.width * 0.25)).cgPath)
+                                context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: modAvatarRoundedRectRadius(displayDimensions.width)).cgPath)
                                 context.clip()
                             case .bubble:
                                 let rect = CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset)
@@ -283,7 +284,7 @@ public func peerAvatarImage(postbox: Postbox, peerReference: PeerReference?, aut
                                     context.fillEllipse(in: CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset))
                                 case .roundedRect:
                                     context.beginPath()
-                                    context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: floor(displayDimensions.width * 0.25)).cgPath)
+                                    context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: modAvatarRoundedRectRadius(displayDimensions.width)).cgPath)
                                     context.fillPath()
                                 case .bubble:
                                     let rect = CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset)
@@ -309,7 +310,7 @@ public func peerAvatarImage(postbox: Postbox, peerReference: PeerReference?, aut
                             context.fillEllipse(in: CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset))
                         case .roundedRect:
                             context.beginPath()
-                            context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: floor(displayDimensions.width * 0.25)).cgPath)
+                            context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: modAvatarRoundedRectRadius(displayDimensions.width)).cgPath)
                             context.fillPath()
                         case .bubble:
                             let rect = CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset)
@@ -357,7 +358,7 @@ public func peerAvatarImage(postbox: Postbox, peerReference: PeerReference?, aut
                                 context.fillEllipse(in: CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset))
                             case .roundedRect:
                                 context.beginPath()
-                                context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: floor(displayDimensions.width * 0.25)).cgPath)
+                                context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: displayDimensions.width, height: displayDimensions.height).insetBy(dx: inset, dy: inset), cornerRadius: modAvatarRoundedRectRadius(displayDimensions.width)).cgPath)
                                 context.fillPath()
                             case .bubble:
                                 let rect = CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset)
@@ -395,7 +396,7 @@ public func peerAvatarImage(postbox: Postbox, peerReference: PeerReference?, aut
 public func drawPeerAvatarLetters(context: CGContext, size: CGSize, round: Bool = true, font: UIFont, letters: [String], peerId: EnginePeer.Id, nameColor: PeerColor?) {
     if round {
         context.beginPath()
-        context.addEllipse(in: CGRect(x: 0.0, y: 0.0, width: size.width, height:
+        modAddAvatarPath(context: context, rect: CGRect(x: 0.0, y: 0.0, width: size.width, height:
             size.height))
         context.clip()
     }
@@ -478,7 +479,7 @@ public func generateAvatarImage(size: CGSize, icon: UIImage?, iconScale: CGFloat
                 context.addPath(roundedRect.cgPath)
             }
         } else {
-            context.addEllipse(in: CGRect(x: 0.0, y: 0.0, width: size.width, height: size.height))
+            modAddAvatarPath(context: context, rect: CGRect(x: 0.0, y: 0.0, width: size.width, height: size.height))
         }
         context.clip()
         

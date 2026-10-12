@@ -10,6 +10,7 @@ swift_library(
         "-warnings-as-errors",
     ],
     deps = [
+        "//Swiftgram/ModSettings:ModSettings",
         "//submodules/Display",
         "//submodules/ComponentFlow",
         "//submodules/TelegramPresentationData",

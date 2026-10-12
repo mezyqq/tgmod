@@ -12,6 +12,7 @@ swift_library(
         "//Swiftgram/ModTypingAnimation:ModTypingAnimation",
         "//Swiftgram/ModVoice:ModVoice",
         "//Swiftgram/ModFaceMask:ModFaceMask",
+        "//Swiftgram/ModText:ModText",
     ],
     visibility = [
         "//visibility:public",

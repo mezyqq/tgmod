@@ -1,4 +1,5 @@
 import Foundation
+import ModSettings
 import UIKit
 import Display
 import ComponentFlow
@@ -447,7 +448,8 @@ public final class AvatarStoryIndicatorComponent: Component {
         self.inactiveLineWidth = inactiveLineWidth
         self.counters = counters
         self.progress = progress
-        self.isRoundedRect = isRoundedRect
+        // MARK: Mod - square avatars
+        self.isRoundedRect = isRoundedRect || ModSettings.squareAvatars
     }
     
     public static func ==(lhs: AvatarStoryIndicatorComponent, rhs: AvatarStoryIndicatorComponent) -> Bool {
@@ -693,7 +695,7 @@ public final class AvatarStoryIndicatorComponent: Component {
                     if component.isRoundedRect {
                         let lineWidth: CGFloat = (component.hasUnseen || component.hasLiveItems) ? component.activeLineWidth : component.inactiveLineWidth
                         context.setLineWidth(lineWidth)
-                        let path = UIBezierPath(roundedRect: CGRect(origin: CGPoint(x: size.width * 0.5 - diameter * 0.5, y: size.height * 0.5 - diameter * 0.5), size: size).insetBy(dx: lineWidth * 0.5, dy: lineWidth * 0.5), cornerRadius: floor(diameter * 0.27))
+                        let path = UIBezierPath(roundedRect: CGRect(origin: CGPoint(x: size.width * 0.5 - diameter * 0.5, y: size.height * 0.5 - diameter * 0.5), size: size).insetBy(dx: lineWidth * 0.5, dy: lineWidth * 0.5), cornerRadius: modStoryIndicatorCornerRadius(diameter))
                         
                         var startPoint: CGPoint?
                         var vertices: [CurveVertex] = []
@@ -837,7 +839,7 @@ public final class AvatarStoryIndicatorComponent: Component {
                     let lineWidth: CGFloat = (component.hasUnseen || component.hasLiveItems) ? component.activeLineWidth : component.inactiveLineWidth
                     context.setLineWidth(lineWidth)
                     if component.isRoundedRect {
-                        let path = UIBezierPath(roundedRect: CGRect(origin: CGPoint(x: size.width * 0.5 - diameter * 0.5, y: size.height * 0.5 - diameter * 0.5), size: size).insetBy(dx: lineWidth * 0.5, dy: lineWidth * 0.5), cornerRadius: floor(diameter * 0.27))
+                        let path = UIBezierPath(roundedRect: CGRect(origin: CGPoint(x: size.width * 0.5 - diameter * 0.5, y: size.height * 0.5 - diameter * 0.5), size: size).insetBy(dx: lineWidth * 0.5, dy: lineWidth * 0.5), cornerRadius: modStoryIndicatorCornerRadius(diameter))
                         context.addPath(path.cgPath)
                     } else {
                         context.addEllipse(in: CGRect(origin: CGPoint(x: size.width * 0.5 - diameter * 0.5, y: size.height * 0.5 - diameter * 0.5), size: size).insetBy(dx: lineWidth * 0.5, dy: lineWidth * 0.5))
@@ -936,4 +938,12 @@ public final class AvatarStoryIndicatorComponent: Component {
     public func update(view: View, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
         return view.update(component: self, availableSize: availableSize, state: state, environment: environment, transition: transition)
     }
+}
+
+// MARK: Mod - square avatars
+private func modStoryIndicatorCornerRadius(_ diameter: CGFloat) -> CGFloat {
+    if ModSettings.squareAvatars {
+        return floor(diameter * CGFloat(max(0.0, min(0.5, ModSettings.avatarCornerRatio + 0.03))))
+    }
+    return floor(diameter * 0.27)
 }

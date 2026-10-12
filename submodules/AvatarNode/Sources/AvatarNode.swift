@@ -61,7 +61,7 @@ private class AvatarNodeParameters: NSObject {
         self.icon = icon
         self.explicitColorIndex = explicitColorIndex
         self.hasImage = hasImage
-        self.clipStyle = clipStyle
+        self.clipStyle = modEffectiveClipStyle(clipStyle)
         self.cutoutRect = cutoutRect
         
         super.init()
@@ -260,7 +260,7 @@ public final class AvatarEditOverlayNode: ASDisplayNode {
         }
         
         context.beginPath()
-        context.addEllipse(in: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height:
+        modAddAvatarPath(context: context, rect: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height:
             bounds.size.height))
         context.clip()
         
@@ -734,10 +734,10 @@ public final class AvatarNode: ASDisplayNode {
                 self.imageNode.cornerRadius = 0.0
             case .round:
                 self.imageNode.clipsToBounds = true
-                self.imageNode.cornerRadius = displayDimensions.height * 0.5
+                self.imageNode.cornerRadius = modAvatarCircleRadius(displayDimensions.height)
             case .roundedRect:
                 self.imageNode.clipsToBounds = true
-                self.imageNode.cornerRadius = displayDimensions.height * 0.25
+                self.imageNode.cornerRadius = modAvatarRoundedRectRadius(displayDimensions.height)
             case .bubble:
                 break
             }
@@ -971,7 +971,7 @@ public final class AvatarNode: ASDisplayNode {
                     context.clip()
                 } else if case .roundedRect = parameters.clipStyle {
                     context.beginPath()
-                    context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height: bounds.size.height), cornerRadius: floor(bounds.size.width * 0.25)).cgPath)
+                    context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height: bounds.size.height), cornerRadius: modAvatarRoundedRectRadius(bounds.size.width)).cgPath)
                     context.clip()
                 } else if case .bubble = parameters.clipStyle {
                     context.beginPath()

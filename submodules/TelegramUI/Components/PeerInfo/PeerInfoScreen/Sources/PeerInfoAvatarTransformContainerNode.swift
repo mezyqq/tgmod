@@ -327,10 +327,10 @@ final class PeerInfoAvatarTransformContainerNode: ASDisplayNode {
             var isForum = false
             let avatarCornerRadius: CGFloat
             if case let .channel(channel) = peer, channel.isForumOrMonoForum {
-                avatarCornerRadius = floor(avatarSize * 0.25)
+                avatarCornerRadius = modAvatarRoundedRectRadius(avatarSize)
                 isForum = true
             } else {
-                avatarCornerRadius = avatarSize / 2.0
+                avatarCornerRadius = modAvatarCircleRadius(avatarSize)
             }
             if self.avatarNode.layer.cornerRadius != 0.0 {
                 ContainedViewLayoutTransition.animated(duration: 0.3, curve: .easeInOut).updateCornerRadius(layer: self.avatarNode.contentNode.layer, cornerRadius: avatarCornerRadius)
@@ -446,7 +446,7 @@ final class PeerInfoAvatarTransformContainerNode: ASDisplayNode {
                             if isForum {
                                 maskPath = UIBezierPath(roundedRect: CGRect(origin: CGPoint(), size: self.avatarNode.frame.size), cornerRadius: avatarCornerRadius)
                             } else {
-                                maskPath = UIBezierPath(ovalIn: CGRect(origin: CGPoint(), size: self.avatarNode.frame.size))
+                                maskPath = UIBezierPath(roundedRect: CGRect(origin: CGPoint(), size: self.avatarNode.frame.size), cornerRadius: avatarCornerRadius)
                             }
                             let shape = CAShapeLayer()
                             shape.path = maskPath.cgPath

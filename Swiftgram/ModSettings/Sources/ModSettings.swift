@@ -10,6 +10,7 @@ public final class ModSettings {
         public static let typingStyle = "mod.typing.style"
         public static let typingDuration = "mod.typing.duration"
         public static let typingIntensity = "mod.typing.intensity"
+        public static let typingHaptics = "mod.typing.haptics"
 
         public static let voiceEnabled = "mod.voice.enabled"
         public static let voicePreset = "mod.voice.preset"
@@ -27,6 +28,9 @@ public final class ModSettings {
         public static let maskFollowRotation = "mod.mask.followRotation"
         public static let maskCoverWhenLost = "mod.mask.coverWhenLost"
         public static let maskImageVersion = "mod.mask.imageVersion"
+
+        public static let squareAvatars = "mod.avatars.square"
+        public static let avatarCornerRatio = "mod.avatars.cornerRatio"
     }
 
     private static var defaults: UserDefaults {
@@ -65,6 +69,11 @@ public final class ModSettings {
     public static var typingIntensity: Double {
         get { return self.double(Keys.typingIntensity, 1.0) }
         set { self.defaults.set(newValue, forKey: Keys.typingIntensity) }
+    }
+
+    public static var typingHaptics: Bool {
+        get { return self.defaults.bool(forKey: Keys.typingHaptics) }
+        set { self.defaults.set(newValue, forKey: Keys.typingHaptics) }
     }
 
     // MARK: Voice changer
@@ -154,5 +163,18 @@ public final class ModSettings {
     public static var maskImageVersion: Int {
         get { return self.defaults.integer(forKey: Keys.maskImageVersion) }
         set { self.defaults.set(newValue, forKey: Keys.maskImageVersion) }
+    }
+
+    // MARK: Avatars
+
+    public static var squareAvatars: Bool {
+        get { return self.defaults.bool(forKey: Keys.squareAvatars) }
+        set { self.defaults.set(newValue, forKey: Keys.squareAvatars) }
+    }
+
+    /// Corner radius of square avatars relative to their width, 0 (sharp) ... 0.5 (circle).
+    public static var avatarCornerRatio: Double {
+        get { return self.double(Keys.avatarCornerRatio, 0.12) }
+        set { self.defaults.set(newValue, forKey: Keys.avatarCornerRatio) }
     }
 }

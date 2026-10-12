@@ -280,8 +280,8 @@ final class CameraRoundVideoFilter {
             }
         }
         
-        // MARK: Mod - face mask
-        effectiveSourceImage = ModFaceMask.shared.apply(to: effectiveSourceImage)
+        // MARK: Mod - face mask, mirror, color filter
+        effectiveSourceImage = modProcessRoundVideoFrame(effectiveSourceImage)
         
         let extendedImage = effectiveSourceImage.clampedToExtent()
         

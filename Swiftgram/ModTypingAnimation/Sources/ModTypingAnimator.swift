@@ -55,6 +55,7 @@ public final class ModTypingAnimator {
     private weak var lastView: UIView?
     private var lastLength: Int = 0
     private var nextHoleId: Int = 0
+    private let hapticGenerator = UIImpactFeedbackGenerator(style: .light)
     private let maskStates = NSMapTable<UIView, MaskState>(keyOptions: .weakMemory, valueOptions: .strongMemory)
 
     private init() {
@@ -70,11 +71,14 @@ public final class ModTypingAnimator {
         self.lastView = inputView
         self.lastLength = newLength
 
+        let delta = newLength - previousLength
+        if sameView && delta > 0 && ModSettings.typingHaptics {
+            self.hapticGenerator.impactOccurred()
+        }
         let style = ModTypingStyle.current
         if !sameView || style == .none {
             return
         }
-        let delta = newLength - previousLength
         if delta <= 0 || delta > 16 || selectedRange.length != 0 {
             return
         }

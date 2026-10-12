@@ -149,8 +149,8 @@ final class CameraRoundLegacyVideoFilter {
             }
         }
         
-        // MARK: Mod - face mask
-        effectiveSourceImage = ModFaceMask.shared.apply(to: effectiveSourceImage)
+        // MARK: Mod - face mask, mirror, color filter
+        effectiveSourceImage = modProcessRoundVideoFrame(effectiveSourceImage)
         
         borderFilter.setValue(effectiveSourceImage, forKey: kCIInputBackgroundImageKey)
         

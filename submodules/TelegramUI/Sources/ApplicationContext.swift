@@ -1,4 +1,5 @@
 // MARK: Swiftgram
+import ModPersonalBots
 import SGSimpleSettings
 import Foundation
 import UIKit
@@ -118,6 +119,8 @@ final class AuthorizedApplicationContext {
     private let loggedOutDisposable = MetaDisposable()
     private let inAppNotificationSettingsDisposable = MetaDisposable()
     private let notificationMessagesDisposable = MetaDisposable()
+    // MARK: Mod - personal bots
+    private var modPersonalBotEngine: ModPersonalBotEngine?
     private let termsOfServiceUpdatesDisposable = MetaDisposable()
     private let termsOfServiceProceedToBotDisposable = MetaDisposable()
     private let watchNavigateToMessageDisposable = MetaDisposable()
@@ -295,6 +298,8 @@ final class AuthorizedApplicationContext {
             }
         }))
 
+        self.modPersonalBotEngine = ModPersonalBotEngine(account: context.account)
+        
         let engine = context.engine
         self.notificationMessagesDisposable.set((context.account.stateManager.notificationMessages
         |> mapToSignal { messageList -> Signal<[([Message], PeerGroupId, Bool, MessageHistoryThreadData?)], NoError> in
